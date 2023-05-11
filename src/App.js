@@ -1,74 +1,57 @@
-import { useState, useEffect } from "react";
-import BlogList from "./components/BlogList";
+import { useEffect } from "react";
 import Login from "./components/Login";
-import blogService from "./services/blogs";
-import loginService from "./services/login";
+import { useDispatch, useSelector } from "react-redux";
+import { initBlogs } from "./reducers/blogsReducer";
+import { initUser } from "./reducers/authReducer";
+import { initUsers } from "./reducers/usersReducer";
+import Notification from "./components/Notification";
+import { Routes, Route, Navigate, useMatch } from "react-router-dom";
+import Home from "./components/Home";
+import Nav from "./components/Nav";
+import UserList from "./components/UserList";
+import User from "./components/User";
+import Blog from "./components/Blog";
+import { Container } from "@mui/material";
 
 const App = () => {
-    const [blogs, setBlogs] = useState([]);
-    const [username, setUsername] = useState("");
-    const [password, setPassword] = useState("");
-    const [user, setUser] = useState(null);
-    const [info, setInfo] = useState({ message: null });
+    const dispatch = useDispatch();
+    const user = useSelector(state => state.user);
+    const userMatch = useMatch("/users/:id");
+    const matchedUser = useSelector(state => {
+        if (userMatch) {
+            return state.users.find(u => u.id === userMatch.params.id);
+        }
+        return null;
+    });
 
-    const notifyWith = (message, type="info") => {
-        setInfo({
-            message, type
-        });
-
-        setTimeout(() => {
-            setInfo({ message: null } );
-        }, 3000);
-    };
+    const blogMatch = useMatch("/blogs/:id");
+    const matchedBlog = useSelector(state => {
+        if (blogMatch) {
+            return state.blogs.find(b => b.id === blogMatch.params.id);
+        }
+        return null;
+    });
 
     useEffect(() => {
-        blogService.getAll().then(blogs =>
-            setBlogs(blogs)
-        );
-    }, []);
-
-    useEffect(() => {
-        const loggedUserJSON = window.localStorage.getItem("loggedUser");
-        if (loggedUserJSON) {
-            const user = JSON.parse(loggedUserJSON);
-            setUser(user);
-            blogService.setToken(user.token);
-        }
-    }, []);
-
-    const onLoginHandler = async event => {
-        event.preventDefault();
-
-        try {
-            const user = await loginService.login({ username, password });
-            setUser(user);
-            window.localStorage.setItem("loggedUser", JSON.stringify(user));
-            setUsername("");
-            setPassword("");
-        } catch (exception) {
-            notifyWith("wrong username or password", "error");
-        }
-    };
-
-    const onLogoutHandler = () => {
-        window.localStorage.removeItem("loggedUser");
-        blogService.setToken("");
-        setUser(null);
-    };
+        dispatch(initBlogs());
+        dispatch(initUser());
+        dispatch(initUsers());
+    }, [dispatch]);
 
     return (
-        <div>
-            {user === null && <Login
-                onLogin={onLoginHandler}
-                username={username} setUsername={setUsername}
-                password={password} setPassword={setPassword}
-                info={info} notifyWith={notifyWith}
-            />}
-            {user && <BlogList
-                blogs={blogs} user={user} onLogout={onLogoutHandler} setBlogs={setBlogs}
-                info={info} notifyWith={notifyWith}
-            />}
-        </div>
+        <Container>
+            { user && <Nav /> }
+            <h1>Blogs App</h1>
+            <Notification />
+
+            <Routes>
+                <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
+                <Route path="/users" element={user ? <UserList /> : <Navigate to="/login" />} />
+                <Route path="/users/:id" element={user ? <User user={matchedUser} /> : <Navigate to="/login" />} />
+                <Route path="/blogs/:id" element={user ? <Blog blog={matchedBlog} /> : <Navigate to="/login" /> } />
+                <Route path="/" element={user ? <Home /> : <Navigate to="/login" />} />
+            </Routes>
+        </Container>
     );
 };
 
